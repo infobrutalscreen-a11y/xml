@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<yml_catalog date="2025-01-01">
+  <shop>
+    <name>Feed Converter</name>
+    <company>Feed Converter</company>
+    <currencies>
+      <currency id="RUB" rate="1"/>
+    </currencies>
+    <categories>
+      <category id="1">Автомобили</category>
+    </categories>
+    <offers>
+
+    </offers>
+  </shop>
+</yml_catalog>
