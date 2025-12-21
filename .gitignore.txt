@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+
+venv/
+.env
+
+temp_input.xml
+temp_output.yml
+output.yml
+
+*.gz
+*.zip
+*.rar
