@@ -19,7 +19,7 @@ async def index(request: Request):
     )
 
 
-# ---------- API v1 (файл) ----------
+# ---------- API v1 (файл YML) ----------
 
 @app.post("/api/v1/convert")
 async def api_convert(file: UploadFile = File(...)):
