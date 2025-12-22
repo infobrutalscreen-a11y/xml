@@ -17,21 +17,19 @@ async def index(request: Request):
     )
 
 
-@app.post("/convert")
-async def convert_file(file: UploadFile = File(...)):
-    temp_input_path = "temp_input.xml"
-    temp_output_path = "temp_output.yml"
+@app.post("/api/v1/convert")
+async def api_convert(file: UploadFile = File(...)):
+    temp_input = "temp_input.xml"
+    temp_output = "temp_output.yml"
 
-    with open(temp_input_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    with open(temp_input, "wb") as f:
+        f.write(await file.read())
 
-    try:
-        convert(temp_input_path, temp_output_path)
-    except Exception as e:
-        return {"error": str(e)}
+    convert(temp_input, temp_output)
 
     return FileResponse(
-        temp_output_path,
+        temp_output,
         media_type="application/x-yaml",
-        filename="output.yml"
+        filename="feed.yml"
     )
+
