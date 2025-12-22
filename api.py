@@ -3,13 +3,23 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from convert import convert
+import os
+from fastapi import FastAPI, UploadFile, File, Request, Depends, Header, HTTPException
 
 app = FastAPI(title="XML → YML Converter")
+API_KEY = os.getenv("API_KEY")
 
 templates = Jinja2Templates(directory="templates")
 
+async def check_api_key(x_api_key: str = Header(...)):
+    if x_api_key != API_KEY:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid API key"
+        )
 
-# ---------- WEB (форма) ----------
+
+# ---------- WEB ----------
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -19,7 +29,7 @@ async def index(request: Request):
     )
 
 
-# ---------- API v1 (файл YML) ----------
+# ---------- API v1: файл ----------
 
 @app.post("/api/v1/convert")
 async def api_convert(file: UploadFile = File(...)):
@@ -38,7 +48,7 @@ async def api_convert(file: UploadFile = File(...)):
     )
 
 
-# ---------- API v1 (JSON) ----------
+# ---------- API v1: JSON ----------
 
 @app.post("/api/v1/convert/json")
 async def api_convert_json(file: UploadFile = File(...)):
@@ -52,12 +62,12 @@ async def api_convert_json(file: UploadFile = File(...)):
         convert(temp_input, temp_output)
 
         with open(temp_output, "r", encoding="utf-8") as f:
-            yml_data = f.read()
+            content = f.read()
 
         return {
             "status": "ok",
             "format": "yml",
-            "content": yml_data
+            "content": content
         }
 
     except Exception as e:
