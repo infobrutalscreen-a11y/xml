@@ -1,37 +1,36 @@
-from fastapi import FastAPI, UploadFile, File, Request
+import os
+from fastapi import FastAPI, UploadFile, File, Request, Depends, Header, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from convert import convert
-import os
-from fastapi import FastAPI, UploadFile, File, Request, Depends, Header, HTTPException
 
 app = FastAPI(title="XML → YML Converter")
+
 API_KEY = os.getenv("API_KEY")
 
 templates = Jinja2Templates(directory="templates")
 
-async def check_api_key(x_api_key: str = Header(...)):
+
+# ---------- API KEY ----------
+
+def check_api_key(x_api_key: str = Header(...)):
+    if not API_KEY:
+        raise HTTPException(status_code=500, detail="API_KEY not set")
     if x_api_key != API_KEY:
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid API key"
-        )
+        raise HTTPException(status_code=403, detail="Invalid API key")
 
 
 # ---------- WEB ----------
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request}
-    )
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 # ---------- API v1: файл ----------
 
-@app.post("/api/v1/convert")
+@app.post("/api/v1/convert", dependencies=[Depends(check_api_key)])
 async def api_convert(file: UploadFile = File(...)):
     temp_input = "temp_input.xml"
     temp_output = "temp_output.yml"
@@ -50,7 +49,7 @@ async def api_convert(file: UploadFile = File(...)):
 
 # ---------- API v1: JSON ----------
 
-@app.post("/api/v1/convert/json")
+@app.post("/api/v1/convert/json", dependencies=[Depends(check_api_key)])
 async def api_convert_json(file: UploadFile = File(...)):
     try:
         temp_input = "temp_input.xml"
