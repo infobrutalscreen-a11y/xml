@@ -1,98 +1,84 @@
-from fastapi import (
-    FastAPI, UploadFile, File, Request,
-    Header, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Request
+from fastapi.responses import Response, HTMLResponse
+from pathlib import Path
+import time
+import logging
+
+from convert import convert_xml_to_yml
+
+BASE_DIR = Path(__file__).parent
+LOG_FILE = BASE_DIR / "access.log"
+
+API_KEY = "supersecretkey123"
+
+# ---------- ЛОГГЕР ----------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()
+    ]
 )
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
+logger = logging.getLogger("api")
 
-import os
-from convert import convert
+# ---------- APP ----------
+app = FastAPI()
 
-# ---------------- APP ----------------
 
-app = FastAPI(title="XML → YML Converter")
-templates = Jinja2Templates(directory="templates")
+# ---------- HEALTH ----------
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
-# ---------------- API KEY ----------------
 
-API_KEY = os.getenv("API_KEY", "supersecretkey123")
-
-async def check_api_key(x_api_key: str = Header(...)):
-    if x_api_key != API_KEY:
-        raise HTTPException(status_code=403, detail="Invalid API key")
-
-# ---------------- RATE LIMIT ----------------
-
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_middleware(SlowAPIMiddleware)
-
-@app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    return JSONResponse(
-        status_code=429,
-        content={"detail": "Rate limit exceeded"}
-    )
-
-# ---------------- WEB ----------------
-
+# ---------- HTML ----------
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request}
-    )
+def index():
+    return """
+    <html>
+        <body>
+            <h2>XML → YML</h2>
+            <form action="/api/v1/convert" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" required>
+                <button type="submit">Convert</button>
+            </form>
+        </body>
+    </html>
+    """
 
-# ---------------- API v1 FILE ----------------
 
+# ---------- API ----------
 @app.post("/api/v1/convert")
-@limiter.limit("10/minute")
 async def api_convert(
     request: Request,
     file: UploadFile = File(...),
-    _: None = Depends(check_api_key)
+    x_api_key: str | None = Header(default=None)
 ):
-    temp_input = "temp_input.xml"
-    temp_output = "temp_output.yml"
+    start = time.time()
+    client_ip = request.client.host if request.client else "unknown"
 
-    with open(temp_input, "wb") as f:
-        f.write(await file.read())
+    if x_api_key != API_KEY:
+        logger.warning(f"{client_ip} | 403 | invalid api key")
+        raise HTTPException(status_code=403, detail="Invalid API key")
 
-    convert(temp_input, temp_output)
+    if not file.filename.endswith(".xml"):
+        logger.warning(f"{client_ip} | 400 | bad file {file.filename}")
+        raise HTTPException(status_code=400, detail="Only XML allowed")
 
-    return FileResponse(
-        temp_output,
-        media_type="application/x-yaml",
-        filename="feed.yml"
-    )
+    try:
+        xml_data = await file.read()
+        yml = convert_xml_to_yml(xml_data)
 
-# ---------------- API v1 JSON ----------------
+        duration = round(time.time() - start, 3)
+        logger.info(f"{client_ip} | 200 | {file.filename} | {duration}s")
 
-@app.post("/api/v1/convert/json")
-@limiter.limit("10/minute")
-async def api_convert_json(
-    request: Request,
-    file: UploadFile = File(...),
-    _: None = Depends(check_api_key)
-):
-    temp_input = "temp_input.xml"
-    temp_output = "temp_output.yml"
+        return Response(
+            content=yml,
+            media_type="application/xml"
+        )
 
-    with open(temp_input, "wb") as f:
-        f.write(await file.read())
-
-    convert(temp_input, temp_output)
-
-    with open(temp_output, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    return {
-        "status": "ok",
-        "format": "yml",
-        "content": content
-    }
+    except Exception as e:
+        logger.error(f"{client_ip} | 500 | {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal error")
