@@ -1,4 +1,7 @@
-from fastapi import FastAPI, UploadFile, File, Request, Header, HTTPException
+from fastapi import (
+    FastAPI, UploadFile, File, Request,
+    Header, HTTPException, Depends
+)
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
@@ -13,7 +16,6 @@ from convert import convert
 # ---------------- APP ----------------
 
 app = FastAPI(title="XML → YML Converter")
-
 templates = Jinja2Templates(directory="templates")
 
 # ---------------- API KEY ----------------
@@ -48,11 +50,12 @@ async def index(request: Request):
 
 # ---------------- API v1 FILE ----------------
 
-@app.post("/api/v1/convert", dependencies=[Header(..., alias="X-API-Key")])
+@app.post("/api/v1/convert")
 @limiter.limit("10/minute")
 async def api_convert(
     request: Request,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    _: None = Depends(check_api_key)
 ):
     temp_input = "temp_input.xml"
     temp_output = "temp_output.yml"
@@ -70,11 +73,12 @@ async def api_convert(
 
 # ---------------- API v1 JSON ----------------
 
-@app.post("/api/v1/convert/json", dependencies=[Header(..., alias="X-API-Key")])
+@app.post("/api/v1/convert/json")
 @limiter.limit("10/minute")
 async def api_convert_json(
     request: Request,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    _: None = Depends(check_api_key)
 ):
     temp_input = "temp_input.xml"
     temp_output = "temp_output.yml"
