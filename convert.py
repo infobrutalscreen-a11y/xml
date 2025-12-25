@@ -2,6 +2,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Optional
 
+
 # =====================
 # ВНУТРЕННЯЯ МОДЕЛЬ
 # =====================
@@ -15,8 +16,9 @@ class Car:
 
 
 # =====================
-# КОНВЕРТАЦИЯ
+# УТИЛИТЫ
 # =====================
+
 def get_text(parent, *tags):
     for tag in tags:
         el = parent.find(tag)
@@ -28,7 +30,13 @@ def get_text(parent, *tags):
 def clean_price(value):
     if not value:
         return None
-    return int("".join(c for c in value if c.isdigit()))
+    digits = "".join(c for c in value if c.isdigit())
+    return int(digits) if digits else None
+
+
+# =====================
+# КОНВЕРТАЦИЯ ФАЙЛ → ФАЙЛ
+# =====================
 
 def convert(input_xml: str, output_yml: str):
     tree = ET.parse(input_xml)
@@ -44,10 +52,10 @@ def convert(input_xml: str, output_yml: str):
         picture = get_text(car, "picture", "image", "photo")
 
         price = clean_price(price_raw)
-        
+
         if not name or not price or not url:
-          print(f"Пропущен товар #{i} — некорректные данные")
-          continue
+            print(f"Пропущен товар #{i} — некорректные данные")
+            continue
 
         cars.append(
             Car(
@@ -101,3 +109,23 @@ def convert(input_xml: str, output_yml: str):
     with open(output_yml, "w", encoding="utf-8") as f:
         f.write(yml)
 
+
+# =====================
+# КОНВЕРТАЦИЯ bytes → str (ДЛЯ API)
+# =====================
+
+def convert_xml_to_yml(xml_bytes: bytes) -> str:
+    """
+    Адаптер для API.
+    Принимает XML как bytes, возвращает YML как str.
+    """
+    temp_input = "temp_api_input.xml"
+    temp_output = "temp_api_output.yml"
+
+    with open(temp_input, "wb") as f:
+        f.write(xml_bytes)
+
+    convert(temp_input, temp_output)
+
+    with open(temp_output, "r", encoding="utf-8") as f:
+        return f.read()
