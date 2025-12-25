@@ -9,6 +9,10 @@ class Formatter:
     def render(self, cars):
         return self.fn(cars)
 
+    def __call__(self, cars):
+        return self.fn(cars)
+
+
 
 def get_formatter(name: str) -> Formatter:
     if name == "yml":

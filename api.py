@@ -40,7 +40,7 @@ async def convert_feed(
     xml_bytes = await file.read()
     cars = parse_cars(xml_bytes)
     formatter = get_formatter(format)
-    result = formatter(cars)
+    result = formatter.render(cars)
 
     content_type = "application/xml"
     filename = f"feed.{format}.xml"
