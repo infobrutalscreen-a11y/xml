@@ -1,84 +1,82 @@
-from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Request
-from fastapi.responses import Response, HTMLResponse
-from pathlib import Path
-import time
-import logging
+import os
+from fastapi import FastAPI, UploadFile, File, Request, Header, HTTPException
+from fastapi.responses import HTMLResponse, Response, JSONResponse
+from fastapi.templating import Jinja2Templates
 
-from convert import convert_xml_to_yml
-
-BASE_DIR = Path(__file__).parent
-LOG_FILE = BASE_DIR / "access.log"
-
-API_KEY = "supersecretkey123"
-
-# ---------- ЛОГГЕР ----------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler()
-    ]
-)
-
-logger = logging.getLogger("api")
-
-# ---------- APP ----------
-app = FastAPI()
+from formats.parser import parse_cars
+from formats.factory import get_formatter
 
 
-# ---------- HEALTH ----------
+app = FastAPI(title="Feed Converter API")
+templates = Jinja2Templates(directory="templates")
+
+API_KEY = os.getenv("API_KEY", "supersecretkey123")
+
+
+async def check_api_key(x_api_key: str = Header(...)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
 @app.get("/health")
-def health():
+async def health():
     return {"status": "ok"}
 
 
-# ---------- HTML ----------
-@app.get("/", response_class=HTMLResponse)
-def index():
-    return """
-    <html>
-        <body>
-            <h2>XML → YML</h2>
-            <form action="/api/v1/convert" method="post" enctype="multipart/form-data">
-                <input type="file" name="file" required>
-                <button type="submit">Convert</button>
-            </form>
-        </body>
-    </html>
-    """
-
-
-# ---------- API ----------
 @app.post("/api/v1/convert")
-async def api_convert(
-    request: Request,
+async def convert_feed(
     file: UploadFile = File(...),
-    x_api_key: str | None = Header(default=None)
+    format: str = "yml",
+    x_api_key: str = Header(...)
 ):
-    start = time.time()
-    client_ip = request.client.host if request.client else "unknown"
-
     if x_api_key != API_KEY:
-        logger.warning(f"{client_ip} | 403 | invalid api key")
         raise HTTPException(status_code=403, detail="Invalid API key")
 
-    if not file.filename.endswith(".xml"):
-        logger.warning(f"{client_ip} | 400 | bad file {file.filename}")
-        raise HTTPException(status_code=400, detail="Only XML allowed")
+    xml_bytes = await file.read()
+    cars = parse_cars(xml_bytes)
+    formatter = get_formatter(format)
+    result = formatter.render(cars)
+
+    content_type = "application/xml"
+    filename = f"feed.{format}.xml"
+
+    if format == "yml":
+        filename = "feed.yml"
+        content_type = "application/x-yaml"
+
+    return Response(
+        content=result,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.post("/api/v1/convert/json")
+async def convert_feed_json(
+    file: UploadFile = File(...),
+    format: str = "yml",
+    x_api_key: str = Header(...)
+):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API key")
 
     try:
-        xml_data = await file.read()
-        yml = convert_xml_to_yml(xml_data)
+        xml_bytes = await file.read()
+        cars = parse_cars(xml_bytes)
+        formatter = get_formatter(format)
+        result = formatter.render(cars)
 
-        duration = round(time.time() - start, 3)
-        logger.info(f"{client_ip} | 200 | {file.filename} | {duration}s")
-
-        return Response(
-            content=yml,
-            media_type="application/xml"
-        )
+        return {
+            "status": "ok",
+            "format": format,
+            "items": len(cars),
+            "content": result
+        }
 
     except Exception as e:
-        logger.error(f"{client_ip} | 500 | {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal error")
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
