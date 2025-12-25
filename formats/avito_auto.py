@@ -1,22 +1,37 @@
-﻿def format_avito_auto(cars):
-    lines = []
-    lines.append('<?xml version="1.0" encoding="UTF-8"?>')
-    lines.append('<Ads formatVersion="3" target="Avito.ru">')
+﻿from typing import List
+from convert import Car
+
+
+def format_avito_auto(cars: List[Car]) -> str:
+    xml = []
+    xml.append('<?xml version="1.0" encoding="UTF-8"?>')
+    xml.append('<Ads formatVersion="3" target="Avito.ru">')
 
     for car in cars:
-        lines.append("  <Ad>")
-        lines.append(f"    <Title>{car.name}</Title>")
-        lines.append(f"    <Price>{car.price}</Price>")
-        lines.append("    <Currency>RUB</Currency>")
-        lines.append("    <Category>втомобили</Category>")
-        lines.append(f"    <URL>{car.url}</URL>")
+        condition = "Новое" if car.condition == "new" else "С пробегом"
+
+        xml.append("  <Ad>")
+        xml.append("    <Category>Автомобили</Category>")
+        xml.append("    <OperationType>Продам</OperationType>")
+        xml.append("    <AdType>Автомобиль</AdType>")
+
+        xml.append(f"    <Id>{car.folder_id}</Id>")
+        xml.append(f"    <Title>{car.modification_id}</Title>")
+        xml.append(f"    <Brand>{car.mark_id}</Brand>")
+
+        xml.append(f"    <Condition>{condition}</Condition>")
+        xml.append(f"    <Year>{car.year}</Year>")
+        xml.append(f"    <Price>{car.price}</Price>")
+
+        if car.vin:
+            xml.append(f"    <VIN>{car.vin}</VIN>")
 
         if car.picture:
-            lines.append("    <Images>")
-            lines.append(f"      <Image url=\"{car.picture}\"/>")
-            lines.append("    </Images>")
+            xml.append("    <Images>")
+            xml.append(f"      <Image url=\"{car.picture}\"/>")
+            xml.append("    </Images>")
 
-        lines.append("  </Ad>")
+        xml.append("  </Ad>")
 
-    lines.append("</Ads>")
-    return "\n".join(lines)
+    xml.append("</Ads>")
+    return "\n".join(xml)
