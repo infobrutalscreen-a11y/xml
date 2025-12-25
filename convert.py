@@ -3,10 +3,6 @@ from dataclasses import dataclass
 from typing import Optional, List
 
 
-# =====================
-# ВНУТРЕННЯЯ МОДЕЛЬ
-# =====================
-
 @dataclass
 class Car:
     mark_id: str
@@ -25,7 +21,7 @@ class Car:
     @property
     def condition(self) -> str:
         """
-        NEW / USED определяется по owners_number
+        Определяет NEW / USED по owners_number.
         """
         if not self.owners_number_raw:
             return "new"
@@ -35,7 +31,7 @@ class Car:
         if "не было" in txt:
             return "new"
 
-        digits = "".join(c for c in txt if c.isdigit())
+        digits = "".join([c for c in txt if c.isdigit()])
         if digits:
             try:
                 return "used" if int(digits) > 0 else "new"
@@ -49,7 +45,7 @@ class Car:
 
 
 # =====================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ВСПОМОГАТЕЛЬНОЕ
 # =====================
 
 def get_text(parent: ET.Element, tag: str) -> Optional[str]:
@@ -59,10 +55,10 @@ def get_text(parent: ET.Element, tag: str) -> Optional[str]:
     return None
 
 
-def clean_price(value: str) -> Optional[int]:
+def clean_price(value: Optional[str]) -> Optional[int]:
     if not value:
         return None
-    digits = "".join(c for c in value if c.isdigit())
+    digits = "".join([c for c in value if c.isdigit()])
     return int(digits) if digits else None
 
 
@@ -70,20 +66,16 @@ def get_first_picture(car: ET.Element) -> Optional[str]:
     images_tag = car.find("images")
     if images_tag is None:
         return None
-
     image = images_tag.find("image")
-    if image is not None and image.text:
-        text = image.text.strip()
-        if text and not text.lower().startswith("http://none"):
-            return text
-
+    if image is not None and image.text and image.text.strip():
+        return image.text.strip()
     return None
 
 
 def get_phone(car: ET.Element) -> Optional[str]:
-    phone_el = car.find(".//contact/phone")
-    if phone_el is not None and phone_el.text:
-        return phone_el.text.strip()
+    contact = car.find(".//contact/phone")
+    if contact is not None and contact.text:
+        return contact.text.strip()
     return None
 
 
@@ -109,7 +101,6 @@ def parse_cars(xml_bytes: bytes) -> List[Car]:
         phone = get_phone(car)
         picture = get_first_picture(car)
 
-        # обязательные поля
         if not (mark_id and folder_id and modification_id and year_raw and price_raw and url):
             continue
 
@@ -140,44 +131,3 @@ def parse_cars(xml_bytes: bytes) -> List[Car]:
         )
 
     return cars
-
-
-# =====================
-# YML FORMATTER (Яндекс)
-# =====================
-
-def format_yml(cars: List[Car]) -> str:
-    yml = []
-    yml.append('<?xml version="1.0" encoding="UTF-8"?>')
-    yml.append('<yml_catalog date="2025-01-01">')
-    yml.append('  <shop>')
-    yml.append('    <name>Feed Converter</name>')
-    yml.append('    <company>Feed Converter</company>')
-    yml.append('    <currencies>')
-    yml.append('      <currency id="RUB" rate="1"/>')
-    yml.append('    </currencies>')
-    yml.append('    <categories>')
-    yml.append('      <category id="1">Автомобили</category>')
-    yml.append('    </categories>')
-    yml.append('    <offers>')
-
-    for car in cars:
-        yml.append(f'      <offer id="{car.folder_id}" available="true">')
-        yml.append(f'        <url>{car.url}</url>')
-        yml.append(f'        <price>{car.price}</price>')
-        yml.append('        <currencyId>RUB</currencyId>')
-        yml.append('        <categoryId>1</categoryId>')
-
-        if car.picture:
-            yml.append(f'        <picture>{car.picture}</picture>')
-
-        yml.append(f'        <name>{car.modification_id}</name>')
-        yml.append(f'        <vendor>{car.mark_id}</vendor>')
-        yml.append(f'        <year>{car.year}</year>')
-        yml.append('      </offer>')
-
-    yml.append('    </offers>')
-    yml.append('  </shop>')
-    yml.append('</yml_catalog>')
-
-    return "\n".join(yml)

@@ -1,14 +1,20 @@
-﻿from formats.yml import format_yml
-from formats.avito_auto import format_avito_auto
+﻿from .yml import format_yml
+from .avito_auto import format_avito_auto
 
 
-def get_formatter(fmt: str):
-    fmt = fmt.lower()
+class Formatter:
+    def __init__(self, fn):
+        self.fn = fn
 
-    if fmt == "yml":
-        return format_yml
+    def render(self, cars):
+        return self.fn(cars)
 
-    if fmt in ("avito", "avito_auto"):
-        return format_avito_auto
 
-    raise ValueError(f"Unsupported format: {fmt}")
+def get_formatter(name: str) -> Formatter:
+    if name == "yml":
+        return Formatter(format_yml)
+
+    if name == "avito_auto":
+        return Formatter(format_avito_auto)
+
+    raise ValueError("Unsupported format")
