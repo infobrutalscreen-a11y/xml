@@ -11,9 +11,6 @@ output.yml
 *.gz
 *.zip
 *.rar
-*.log
-access.log
-error.log
-result.yml
+
 -F
-sites-enabled
+-H
