@@ -1,5 +1,9 @@
+# logs
+*.log
+
+# python caches
 __pycache__/
-*.pyc
+**/__pycache__
 
 venv/
 .env
