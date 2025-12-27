@@ -1,207 +1,199 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Feed Converter</title>
   <style>
-    :root { color-scheme: light; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; max-width: 980px; }
-    h1 { margin: 0 0 10px; }
-    .muted { color: #666; font-size: 14px; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin-top: 16px; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    label { display: block; font-size: 14px; margin-bottom: 6px; }
-    input[type="text"], input[type="password"], select {
-      width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 10px; font-size: 14px;
-    }
+    body { font-family: Arial, sans-serif; max-width: 860px; margin: 32px auto; padding: 0 16px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    label { display:block; margin: 10px 0 6px; font-weight: 600; }
+    input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
     input[type="file"] { width: 100%; }
-    button {
-      padding: 10px 14px; border: 0; border-radius: 10px; font-size: 14px; cursor: pointer;
-      background: #111; color: #fff;
-    }
-    button.secondary { background: #444; }
-    button:disabled { opacity: .6; cursor: not-allowed; }
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
-    .status { font-size: 14px; margin-top: 10px; }
-    .ok { color: #0a7a2f; }
-    .err { color: #b00020; }
-    pre, textarea {
-      width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ddd; border-radius: 12px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      font-size: 12px; white-space: pre-wrap; overflow: auto;
-      min-height: 220px;
-    }
-    .small { font-size: 12px; color: #777; }
-    a { color: #0b57d0; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+    button { padding: 10px 14px; border: 0; border-radius: 8px; cursor: pointer; font-weight: 700; }
+    button.primary { background: #2563eb; color: #fff; }
+    button.secondary { background: #eee; }
+    .row { display:flex; gap: 12px; flex-wrap: wrap; }
+    .row > div { flex: 1 1 240px; }
+    pre { background:#0b1020; color:#e5e7eb; padding: 12px; border-radius: 8px; overflow:auto; }
+    .ok { color: #16a34a; font-weight: 700; }
+    .err { color: #dc2626; font-weight: 700; }
+    .muted { color:#6b7280; }
+    .actions { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; margin-top: 14px; }
+    a.download { font-weight: 700; }
   </style>
 </head>
-
 <body>
-  <h1>Feed Converter</h1>
-  <div class="muted">Конвертация XML → YML или Avito Auto через API (с ключом <code>X-API-Key</code>).</div>
+
+  <h2>XML → Конвертер фидов</h2>
+  <p class="muted">Загрузка XML, выбор формата, конвертация через API.</p>
 
   <div class="card">
     <div class="row">
       <div>
-        <label>API ключ</label>
-        <input id="apiKey" type="password" placeholder="supersecretkey123" autocomplete="off" />
-        <div class="small" style="margin-top:6px;">Ключ не сохраняется, просто подставляется в заголовок запроса.</div>
+        <label for="apiKey">API Key (X-API-Key)</label>
+        <input id="apiKey" type="text" placeholder="например: supersecretkey123" autocomplete="off" />
       </div>
-
       <div>
-        <label>Формат результата</label>
+        <label for="format">Формат</label>
         <select id="format">
           <option value="yml">yml</option>
           <option value="avito_auto">avito_auto</option>
         </select>
-        <div class="small" style="margin-top:6px;">Будет вызвано: <code>/api/v1/convert?format=...</code></div>
       </div>
     </div>
 
-    <div class="row" style="margin-top:12px;">
-      <div>
-        <label>Режим ответа</label>
-        <select id="mode">
-          <option value="file">Скачать файл</option>
-          <option value="json">JSON (показать текст в браузере)</option>
-        </select>
-      </div>
-
-      <div>
-        <label>XML файл</label>
-        <input id="file" type="file" accept=".xml,application/xml,text/xml" />
-      </div>
-    </div>
+    <label for="file">XML файл</label>
+    <input id="file" type="file" accept=".xml,text/xml,application/xml" />
 
     <div class="actions">
-      <button id="btnConvert">Конвертировать</button>
-      <button id="btnHealth" class="secondary" type="button">Проверить /health</button>
-      <a id="downloadLink" href="#" style="display:none;" download>Скачать результат</a>
+      <button class="primary" id="btnConvert">Конвертировать</button>
+      <button class="secondary" id="btnHealth">Проверить /health</button>
+      <span id="status" class="muted"></span>
     </div>
-
-    <div id="status" class="status muted"></div>
   </div>
 
   <div class="card">
-    <div class="muted" style="margin-bottom:10px;">Вывод / предпросмотр результата</div>
-    <textarea id="output" spellcheck="false" placeholder="Здесь появится результат (в JSON-режиме) или превью файла..."></textarea>
-    <div class="small" style="margin-top:8px;">
-      Подсказка: если включён rate-limit в nginx, после лимита будет <b>429</b> — это нормально.
+    <h3>Результат</h3>
+    <div id="resultMeta" class="muted">Пока нет результата.</div>
+    <div id="downloadWrap" style="margin-top:10px;"></div>
+    <div style="margin-top:12px;">
+      <label>Превью (первые строки)</label>
+      <pre id="preview">(пусто)</pre>
     </div>
   </div>
 
 <script>
-  const $ = (id) => document.getElementById(id);
+  const apiKeyEl = document.getElementById('apiKey');
+  const formatEl = document.getElementById('format');
+  const fileEl = document.getElementById('file');
+  const statusEl = document.getElementById('status');
+  const previewEl = document.getElementById('preview');
+  const resultMetaEl = document.getElementById('resultMeta');
+  const downloadWrapEl = document.getElementById('downloadWrap');
 
-  function setStatus(text, kind) {
-    const el = $("status");
-    el.textContent = text || "";
-    el.className = "status " + (kind === "ok" ? "ok" : kind === "err" ? "err" : "muted");
+  const btnConvert = document.getElementById('btnConvert');
+  const btnHealth = document.getElementById('btnHealth');
+
+  function setStatus(text, type="muted") {
+    statusEl.className = type === "ok" ? "ok" : (type === "err" ? "err" : "muted");
+    statusEl.textContent = text;
   }
 
-  function safeFilename(format) {
-    if (format === "yml") return "feed.yml";
-    if (format === "avito_auto") return "feed.avito_auto.xml";
-    return "feed.out";
+  function clearResult() {
+    previewEl.textContent = "(пусто)";
+    resultMetaEl.textContent = "Пока нет результата.";
+    downloadWrapEl.innerHTML = "";
   }
 
-  async function healthCheck() {
-    setStatus("Проверяю /health ...", "");
-    $("output").value = "";
-    $("downloadLink").style.display = "none";
-
+  function getFilenameFromDisposition(cd) {
+    // content-disposition: attachment; filename="feed.yml"
+    if (!cd) return null;
+    const m = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)\"?/i);
+    if (!m) return null;
     try {
-      const r = await fetch("/health", { method: "GET" });
-      const txt = await r.text();
-      if (!r.ok) {
-        setStatus(`Health FAIL: HTTP ${r.status}`, "err");
-        $("output").value = txt;
-        return;
-      }
-      setStatus("Health OK", "ok");
-      $("output").value = txt;
-    } catch (e) {
-      setStatus("Ошибка запроса /health: " + e.message, "err");
+      return decodeURIComponent(m[1]);
+    } catch {
+      return m[1];
     }
   }
 
-  async function convert() {
-    $("downloadLink").style.display = "none";
-    $("downloadLink").href = "#";
-    $("output").value = "";
+  async function doHealth() {
+    setStatus("Проверяю /health ...");
+    try {
+      const r = await fetch('/health');
+      const t = await r.text();
+      if (!r.ok) throw new Error("HTTP " + r.status + ": " + t);
+      setStatus("OK: " + t, "ok");
+    } catch (e) {
+      setStatus("Ошибка /health: " + e.message, "err");
+    }
+  }
 
-    const apiKey = $("apiKey").value.trim();
-    const format = $("format").value;
-    const mode = $("mode").value;
-    const f = $("file").files[0];
+  async function doConvert() {
+    clearResult();
 
-    if (!apiKey) { setStatus("Введите API ключ.", "err"); return; }
-    if (!f) { setStatus("Выберите XML файл.", "err"); return; }
+    const apiKey = (apiKeyEl.value || "").trim();
+    const format = formatEl.value;
+    const file = fileEl.files && fileEl.files[0];
+
+    if (!apiKey) {
+      setStatus("Введи API key.", "err");
+      return;
+    }
+    if (!file) {
+      setStatus("Выбери XML файл.", "err");
+      return;
+    }
+
+    setStatus("Отправляю файл на конвертацию...");
 
     const fd = new FormData();
-    fd.append("file", f);
+    fd.append("file", file);
 
-    const url = mode === "json"
-      ? `/api/v1/convert/json?format=${encodeURIComponent(format)}`
-      : `/api/v1/convert?format=${encodeURIComponent(format)}`;
-
-    const btn = $("btnConvert");
-    btn.disabled = true;
-    setStatus("Отправляю запрос... ", "");
+    const url = `/api/v1/convert?format=${encodeURIComponent(format)}`;
 
     try {
       const r = await fetch(url, {
         method: "POST",
-        headers: { "X-API-Key": apiKey },
+        headers: {
+          "X-API-Key": apiKey
+        },
         body: fd
       });
 
+      // обработка ошибок
       if (!r.ok) {
-        let body = "";
-        try { body = await r.text(); } catch {}
-        setStatus(`Ошибка: HTTP ${r.status}`, "err");
-        $("output").value = body || "(пусто)";
-        return;
+        let errText = "";
+        try { errText = await r.text(); } catch {}
+        if (r.status === 403) {
+          throw new Error("403 Forbidden: неверный или отсутствующий API key.");
+        }
+        if (r.status === 429) {
+          throw new Error("429 Too Many Requests: сработал rate limit (nginx). Подожди и попробуй снова.");
+        }
+        throw new Error(`HTTP ${r.status}: ${errText || "ошибка"}`);
       }
 
-      if (mode === "json") {
-        const data = await r.json();
-        setStatus(`OK: items=${data.items}, format=${data.format}`, "ok");
-        $("output").value = data.content || "";
-        return;
-      }
+      const contentType = r.headers.get("content-type") || "";
+      const cd = r.headers.get("content-disposition") || "";
+      const filename = getFilenameFromDisposition(cd) || `feed.${format === "yml" ? "yml" : "xml"}`;
 
-      // file mode
       const blob = await r.blob();
-      const objUrl = URL.createObjectURL(blob);
 
-      const a = $("downloadLink");
-      a.href = objUrl;
-      a.download = safeFilename(format);
-      a.style.display = "inline";
+      resultMetaEl.innerHTML = `
+        <div><b>Формат:</b> ${format}</div>
+        <div><b>Content-Type:</b> ${contentType}</div>
+        <div><b>Размер:</b> ${(blob.size/1024).toFixed(1)} KB</div>
+      `;
 
-      setStatus("OK: файл готов к скачиванию.", "ok");
+      // download link
+      const blobUrl = URL.createObjectURL(blob);
+      downloadWrapEl.innerHTML = `
+        <a class="download" href="${blobUrl}" download="${filename}">⬇ Скачать результат (${filename})</a>
+      `;
 
-      // превью (если текстовое и не слишком большое)
-      const ct = (r.headers.get("content-type") || "").toLowerCase();
-      if (ct.includes("xml") || ct.includes("yaml") || ct.includes("yml") || ct.includes("text")) {
-        const text = await blob.text();
-        $("output").value = text;
-      } else {
-        $("output").value = `Content-Type: ${ct}\nРазмер: ${blob.size} bytes\n\n(Предпросмотр недоступен)`;
-      }
+      // preview first lines
+      const text = await blob.text();
+      const lines = text.split(/\r?\n/).slice(0, 40).join("\n");
+      previewEl.textContent = lines || "(пусто)";
+
+      setStatus("Готово ✅", "ok");
     } catch (e) {
-      setStatus("Ошибка запроса: " + e.message, "err");
-    } finally {
-      btn.disabled = false;
+      setStatus(e.message, "err");
     }
   }
 
-  $("btnConvert").addEventListener("click", (e) => { e.preventDefault(); convert(); });
-  $("btnHealth").addEventListener("click", (e) => { e.preventDefault(); healthCheck(); });
+  btnConvert.addEventListener("click", (e) => {
+    e.preventDefault();
+    doConvert();
+  });
+
+  btnHealth.addEventListener("click", (e) => {
+    e.preventDefault();
+    doHealth();
+  });
 </script>
+
 </body>
 </html>
