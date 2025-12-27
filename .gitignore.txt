@@ -1,20 +1,19 @@
-# logs
-*.log
-
-# python caches
 __pycache__/
-**/__pycache__
+*.pyc
+*.pyo
+*.pyd
 
 venv/
 .env
 
+*.log
+*.pid
+
 temp_input.xml
 temp_output.yml
 output.yml
+result.yml
 
 *.gz
 *.zip
 *.rar
-
--F
--H

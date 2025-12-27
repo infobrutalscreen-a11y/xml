@@ -1,24 +1,207 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Feed Converter</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; max-width: 980px; }
+    h1 { margin: 0 0 10px; }
+    .muted { color: #666; font-size: 14px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin-top: 16px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: block; font-size: 14px; margin-bottom: 6px; }
+    input[type="text"], input[type="password"], select {
+      width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 10px; font-size: 14px;
+    }
+    input[type="file"] { width: 100%; }
+    button {
+      padding: 10px 14px; border: 0; border-radius: 10px; font-size: 14px; cursor: pointer;
+      background: #111; color: #fff;
+    }
+    button.secondary { background: #444; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+    .status { font-size: 14px; margin-top: 10px; }
+    .ok { color: #0a7a2f; }
+    .err { color: #b00020; }
+    pre, textarea {
+      width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ddd; border-radius: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px; white-space: pre-wrap; overflow: auto;
+      min-height: 220px;
+    }
+    .small { font-size: 12px; color: #777; }
+    a { color: #0b57d0; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+  </style>
 </head>
+
 <body>
-  <h2>Конвертация XML → YML / Avito</h2>
+  <h1>Feed Converter</h1>
+  <div class="muted">Конвертация XML → YML или Avito Auto через API (с ключом <code>X-API-Key</code>).</div>
 
-  <form action="/web/convert" method="post" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".xml" required>
-    <br><br>
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>API ключ</label>
+        <input id="apiKey" type="password" placeholder="supersecretkey123" autocomplete="off" />
+        <div class="small" style="margin-top:6px;">Ключ не сохраняется, просто подставляется в заголовок запроса.</div>
+      </div>
 
-    <label>Формат:</label>
-    <select name="format">
-      <option value="yml">yml</option>
-      <option value="avito_auto">avito_auto</option>
-    </select>
+      <div>
+        <label>Формат результата</label>
+        <select id="format">
+          <option value="yml">yml</option>
+          <option value="avito_auto">avito_auto</option>
+        </select>
+        <div class="small" style="margin-top:6px;">Будет вызвано: <code>/api/v1/convert?format=...</code></div>
+      </div>
+    </div>
 
-    <br><br>
-    <button type="submit">Конвертировать</button>
-  </form>
+    <div class="row" style="margin-top:12px;">
+      <div>
+        <label>Режим ответа</label>
+        <select id="mode">
+          <option value="file">Скачать файл</option>
+          <option value="json">JSON (показать текст в браузере)</option>
+        </select>
+      </div>
+
+      <div>
+        <label>XML файл</label>
+        <input id="file" type="file" accept=".xml,application/xml,text/xml" />
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btnConvert">Конвертировать</button>
+      <button id="btnHealth" class="secondary" type="button">Проверить /health</button>
+      <a id="downloadLink" href="#" style="display:none;" download>Скачать результат</a>
+    </div>
+
+    <div id="status" class="status muted"></div>
+  </div>
+
+  <div class="card">
+    <div class="muted" style="margin-bottom:10px;">Вывод / предпросмотр результата</div>
+    <textarea id="output" spellcheck="false" placeholder="Здесь появится результат (в JSON-режиме) или превью файла..."></textarea>
+    <div class="small" style="margin-top:8px;">
+      Подсказка: если включён rate-limit в nginx, после лимита будет <b>429</b> — это нормально.
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function setStatus(text, kind) {
+    const el = $("status");
+    el.textContent = text || "";
+    el.className = "status " + (kind === "ok" ? "ok" : kind === "err" ? "err" : "muted");
+  }
+
+  function safeFilename(format) {
+    if (format === "yml") return "feed.yml";
+    if (format === "avito_auto") return "feed.avito_auto.xml";
+    return "feed.out";
+  }
+
+  async function healthCheck() {
+    setStatus("Проверяю /health ...", "");
+    $("output").value = "";
+    $("downloadLink").style.display = "none";
+
+    try {
+      const r = await fetch("/health", { method: "GET" });
+      const txt = await r.text();
+      if (!r.ok) {
+        setStatus(`Health FAIL: HTTP ${r.status}`, "err");
+        $("output").value = txt;
+        return;
+      }
+      setStatus("Health OK", "ok");
+      $("output").value = txt;
+    } catch (e) {
+      setStatus("Ошибка запроса /health: " + e.message, "err");
+    }
+  }
+
+  async function convert() {
+    $("downloadLink").style.display = "none";
+    $("downloadLink").href = "#";
+    $("output").value = "";
+
+    const apiKey = $("apiKey").value.trim();
+    const format = $("format").value;
+    const mode = $("mode").value;
+    const f = $("file").files[0];
+
+    if (!apiKey) { setStatus("Введите API ключ.", "err"); return; }
+    if (!f) { setStatus("Выберите XML файл.", "err"); return; }
+
+    const fd = new FormData();
+    fd.append("file", f);
+
+    const url = mode === "json"
+      ? `/api/v1/convert/json?format=${encodeURIComponent(format)}`
+      : `/api/v1/convert?format=${encodeURIComponent(format)}`;
+
+    const btn = $("btnConvert");
+    btn.disabled = true;
+    setStatus("Отправляю запрос... ", "");
+
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "X-API-Key": apiKey },
+        body: fd
+      });
+
+      if (!r.ok) {
+        let body = "";
+        try { body = await r.text(); } catch {}
+        setStatus(`Ошибка: HTTP ${r.status}`, "err");
+        $("output").value = body || "(пусто)";
+        return;
+      }
+
+      if (mode === "json") {
+        const data = await r.json();
+        setStatus(`OK: items=${data.items}, format=${data.format}`, "ok");
+        $("output").value = data.content || "";
+        return;
+      }
+
+      // file mode
+      const blob = await r.blob();
+      const objUrl = URL.createObjectURL(blob);
+
+      const a = $("downloadLink");
+      a.href = objUrl;
+      a.download = safeFilename(format);
+      a.style.display = "inline";
+
+      setStatus("OK: файл готов к скачиванию.", "ok");
+
+      // превью (если текстовое и не слишком большое)
+      const ct = (r.headers.get("content-type") || "").toLowerCase();
+      if (ct.includes("xml") || ct.includes("yaml") || ct.includes("yml") || ct.includes("text")) {
+        const text = await blob.text();
+        $("output").value = text;
+      } else {
+        $("output").value = `Content-Type: ${ct}\nРазмер: ${blob.size} bytes\n\n(Предпросмотр недоступен)`;
+      }
+    } catch (e) {
+      setStatus("Ошибка запроса: " + e.message, "err");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  $("btnConvert").addEventListener("click", (e) => { e.preventDefault(); convert(); });
+  $("btnHealth").addEventListener("click", (e) => { e.preventDefault(); healthCheck(); });
+</script>
 </body>
 </html>
