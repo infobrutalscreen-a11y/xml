@@ -1,199 +1,182 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Feed Converter</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>XML → Конвертер фидов</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 860px; margin: 32px auto; padding: 0 16px; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-    label { display:block; margin: 10px 0 6px; font-weight: 600; }
-    input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
-    input[type="file"] { width: 100%; }
-    button { padding: 10px 14px; border: 0; border-radius: 8px; cursor: pointer; font-weight: 700; }
-    button.primary { background: #2563eb; color: #fff; }
-    button.secondary { background: #eee; }
-    .row { display:flex; gap: 12px; flex-wrap: wrap; }
-    .row > div { flex: 1 1 240px; }
-    pre { background:#0b1020; color:#e5e7eb; padding: 12px; border-radius: 8px; overflow:auto; }
-    .ok { color: #16a34a; font-weight: 700; }
-    .err { color: #dc2626; font-weight: 700; }
-    .muted { color:#6b7280; }
-    .actions { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; margin-top: 14px; }
-    a.download { font-weight: 700; }
+    body { font-family: Arial, sans-serif; background:#f6f7fb; margin:0; }
+    .wrap { max-width: 980px; margin: 28px auto; padding: 0 16px; }
+    h1 { margin: 0 0 8px; }
+    .muted { color:#667085; margin: 0 0 18px; }
+    .card { background:#fff; border:1px solid #eaecf0; border-radius: 14px; padding: 18px; box-shadow: 0 1px 10px rgba(0,0,0,.04); }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    label { font-weight: 600; display:block; margin-bottom: 6px; }
+    input[type="text"], select { width:100%; padding:10px 12px; border:1px solid #d0d5dd; border-radius: 10px; }
+    input[type="file"] { width:100%; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap: wrap; margin-top: 14px; }
+    button { padding: 10px 14px; border:0; border-radius: 10px; cursor:pointer; font-weight:700; }
+    .btn-primary { background:#2563eb; color:#fff; }
+    .btn-gray { background:#eef2f6; color:#111827; }
+    .badge { font-weight: 700; }
+    .ok { color:#16a34a; }
+    .err { color:#dc2626; }
+    pre { background:#0b1220; color:#e5e7eb; padding: 14px; border-radius: 12px; overflow:auto; }
+    .result a { font-weight: 700; }
+    .small { font-size: 14px; color:#475467; }
   </style>
 </head>
+
 <body>
+  <div class="wrap">
+    <h1>XML → Конвертер фидов</h1>
+    <p class="muted">Загрузка XML, выбор формата, конвертация через API.</p>
 
-  <h2>XML → Конвертер фидов</h2>
-  <p class="muted">Загрузка XML, выбор формата, конвертация через API.</p>
-
-  <div class="card">
-    <div class="row">
-      <div>
-        <label for="apiKey">API Key (X-API-Key)</label>
-        <input id="apiKey" type="text" placeholder="например: supersecretkey123" autocomplete="off" />
+    <div class="card">
+      <div class="grid">
+        <div>
+          <label>API Key (X-API-Key)</label>
+          <input id="apiKey" type="text" placeholder="вставь ключ" value="supersecretkey123" />
+        </div>
+        <div>
+          <label>Формат</label>
+          <select id="format">
+            <option value="yml">yml</option>
+          </select>
+          <div class="small" style="margin-top:6px;">Список подтянется из <code>/api/v1/formats</code></div>
+        </div>
       </div>
-      <div>
-        <label for="format">Формат</label>
-        <select id="format">
-          <option value="yml">yml</option>
-          <option value="avito_auto">avito_auto</option>
-        </select>
+
+      <div style="margin-top:14px;">
+        <label>XML файл</label>
+        <input id="file" type="file" accept=".xml" />
+      </div>
+
+      <div class="row">
+        <button class="btn-primary" id="btnConvert">Конвертировать</button>
+        <button class="btn-gray" id="btnHealth">Проверить /health</button>
+        <span id="status" class="badge"></span>
       </div>
     </div>
 
-    <label for="file">XML файл</label>
-    <input id="file" type="file" accept=".xml,text/xml,application/xml" />
+    <div style="height:16px;"></div>
 
-    <div class="actions">
-      <button class="primary" id="btnConvert">Конвертировать</button>
-      <button class="secondary" id="btnHealth">Проверить /health</button>
-      <span id="status" class="muted"></span>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>Результат</h3>
-    <div id="resultMeta" class="muted">Пока нет результата.</div>
-    <div id="downloadWrap" style="margin-top:10px;"></div>
-    <div style="margin-top:12px;">
-      <label>Превью (первые строки)</label>
-      <pre id="preview">(пусто)</pre>
+    <div class="card result">
+      <h2 style="margin-top:0;">Результат</h2>
+      <div id="meta" class="small"></div>
+      <div id="download" style="margin: 10px 0;"></div>
+      <div id="previewTitle" style="display:none; font-weight:700; margin: 10px 0 8px;">Превью (первые строки)</div>
+      <pre id="preview" style="display:none;"></pre>
     </div>
   </div>
 
 <script>
-  const apiKeyEl = document.getElementById('apiKey');
-  const formatEl = document.getElementById('format');
-  const fileEl = document.getElementById('file');
-  const statusEl = document.getElementById('status');
-  const previewEl = document.getElementById('preview');
-  const resultMetaEl = document.getElementById('resultMeta');
-  const downloadWrapEl = document.getElementById('downloadWrap');
+  const el = (id) => document.getElementById(id);
 
-  const btnConvert = document.getElementById('btnConvert');
-  const btnHealth = document.getElementById('btnHealth');
-
-  function setStatus(text, type="muted") {
-    statusEl.className = type === "ok" ? "ok" : (type === "err" ? "err" : "muted");
-    statusEl.textContent = text;
+  function setStatus(text, ok=true) {
+    el("status").textContent = text;
+    el("status").className = "badge " + (ok ? "ok" : "err");
   }
 
-  function clearResult() {
-    previewEl.textContent = "(пусто)";
-    resultMetaEl.textContent = "Пока нет результата.";
-    downloadWrapEl.innerHTML = "";
+  async function apiFetch(url, options={}) {
+    const key = el("apiKey").value.trim();
+    options.headers = options.headers || {};
+    if (key) options.headers["X-API-Key"] = key;
+    return fetch(url, options);
   }
 
-  function getFilenameFromDisposition(cd) {
-    // content-disposition: attachment; filename="feed.yml"
-    if (!cd) return null;
-    const m = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)\"?/i);
-    if (!m) return null;
+  async function loadFormats() {
     try {
-      return decodeURIComponent(m[1]);
-    } catch {
-      return m[1];
-    }
+      const r = await apiFetch("/api/v1/formats");
+      if (!r.ok) {
+        // если ключ неверный/пустой — просто не мешаем работать, оставим дефолт
+        return;
+      }
+      const data = await r.json();
+      const formats = data.formats || [];
+      if (!formats.length) return;
+
+      const sel = el("format");
+      sel.innerHTML = "";
+      for (const f of formats) {
+        const opt = document.createElement("option");
+        opt.value = f;
+        opt.textContent = f;
+        sel.appendChild(opt);
+      }
+    } catch(e) {}
   }
 
-  async function doHealth() {
-    setStatus("Проверяю /health ...");
+  el("btnHealth").addEventListener("click", async () => {
     try {
-      const r = await fetch('/health');
-      const t = await r.text();
-      if (!r.ok) throw new Error("HTTP " + r.status + ": " + t);
-      setStatus("OK: " + t, "ok");
-    } catch (e) {
-      setStatus("Ошибка /health: " + e.message, "err");
+      const r = await fetch("/health");
+      if (!r.ok) throw new Error("health not ok");
+      setStatus("Готово ✅", true);
+    } catch(e) {
+      setStatus("Ошибка /health ❌", false);
     }
-  }
+  });
 
-  async function doConvert() {
-    clearResult();
-
-    const apiKey = (apiKeyEl.value || "").trim();
-    const format = formatEl.value;
-    const file = fileEl.files && fileEl.files[0];
-
-    if (!apiKey) {
-      setStatus("Введи API key.", "err");
-      return;
-    }
+  el("btnConvert").addEventListener("click", async () => {
+    const file = el("file").files[0];
     if (!file) {
-      setStatus("Выбери XML файл.", "err");
+      setStatus("Выбери XML файл", false);
       return;
     }
 
-    setStatus("Отправляю файл на конвертацию...");
+    setStatus("Конвертирую…", true);
+    el("meta").textContent = "";
+    el("download").innerHTML = "";
+    el("preview").style.display = "none";
+    el("previewTitle").style.display = "none";
 
-    const fd = new FormData();
-    fd.append("file", file);
-
-    const url = `/api/v1/convert?format=${encodeURIComponent(format)}`;
+    const fmt = el("format").value;
+    const form = new FormData();
+    form.append("file", file);
 
     try {
-      const r = await fetch(url, {
+      const r = await apiFetch(`/api/v1/convert?format=${encodeURIComponent(fmt)}`, {
         method: "POST",
-        headers: {
-          "X-API-Key": apiKey
-        },
-        body: fd
+        body: form
       });
 
-      // обработка ошибок
       if (!r.ok) {
-        let errText = "";
-        try { errText = await r.text(); } catch {}
-        if (r.status === 403) {
-          throw new Error("403 Forbidden: неверный или отсутствующий API key.");
-        }
-        if (r.status === 429) {
-          throw new Error("429 Too Many Requests: сработал rate limit (nginx). Подожди и попробуй снова.");
-        }
-        throw new Error(`HTTP ${r.status}: ${errText || "ошибка"}`);
+        const txt = await r.text();
+        setStatus(`Ошибка ${r.status}`, false);
+        el("meta").textContent = txt;
+        return;
       }
 
-      const contentType = r.headers.get("content-type") || "";
-      const cd = r.headers.get("content-disposition") || "";
-      const filename = getFilenameFromDisposition(cd) || `feed.${format === "yml" ? "yml" : "xml"}`;
-
       const blob = await r.blob();
+      const ct = r.headers.get("content-type") || "";
+      const cd = r.headers.get("content-disposition") || "";
+      let filename = "result.txt";
+      const m = cd.match(/filename="([^"]+)"/);
+      if (m) filename = m[1];
 
-      resultMetaEl.innerHTML = `
-        <div><b>Формат:</b> ${format}</div>
-        <div><b>Content-Type:</b> ${contentType}</div>
-        <div><b>Размер:</b> ${(blob.size/1024).toFixed(1)} KB</div>
-      `;
+      el("meta").innerHTML =
+        `Формат: <b>${fmt}</b><br>` +
+        `Content-Type: ${ct}<br>` +
+        `Размер: ${(blob.size/1024).toFixed(1)} KB`;
 
-      // download link
-      const blobUrl = URL.createObjectURL(blob);
-      downloadWrapEl.innerHTML = `
-        <a class="download" href="${blobUrl}" download="${filename}">⬇ Скачать результат (${filename})</a>
-      `;
+      const url = URL.createObjectURL(blob);
+      el("download").innerHTML = `⬇ <a href="${url}" download="${filename}">Скачать результат (${filename})</a>`;
 
-      // preview first lines
+      // превью (первые ~80 строк)
       const text = await blob.text();
-      const lines = text.split(/\r?\n/).slice(0, 40).join("\n");
-      previewEl.textContent = lines || "(пусто)";
+      const lines = text.split("\n").slice(0, 80).join("\n");
+      el("previewTitle").style.display = "block";
+      el("preview").style.display = "block";
+      el("preview").textContent = lines;
 
-      setStatus("Готово ✅", "ok");
-    } catch (e) {
-      setStatus(e.message, "err");
+      setStatus("Готово ✅", true);
+    } catch(e) {
+      setStatus("Ошибка конвертации ❌", false);
+      el("meta").textContent = String(e);
     }
-  }
-
-  btnConvert.addEventListener("click", (e) => {
-    e.preventDefault();
-    doConvert();
   });
 
-  btnHealth.addEventListener("click", (e) => {
-    e.preventDefault();
-    doHealth();
-  });
+  loadFormats();
 </script>
-
 </body>
 </html>
