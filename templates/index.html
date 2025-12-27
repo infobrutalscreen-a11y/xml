@@ -1,26 +1,24 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>XML → Feed конвертер</title>
+  <meta charset="UTF-8">
+  <title>Feed Converter</title>
 </head>
 <body>
+  <h2>Конвертация XML → YML / Avito</h2>
 
-<h2>Конвертация XML → Feed</h2>
-
-<form action="/api/v1/convert" method="post" enctype="multipart/form-data">
+  <form action="/web/convert" method="post" enctype="multipart/form-data">
     <input type="file" name="file" accept=".xml" required>
     <br><br>
 
     <label>Формат:</label>
     <select name="format">
-        <option value="yml">yml</option>
-        <option value="avito_auto">avito_auto</option>
+      <option value="yml">yml</option>
+      <option value="avito_auto">avito_auto</option>
     </select>
 
     <br><br>
     <button type="submit">Конвертировать</button>
-</form>
-
+  </form>
 </body>
 </html>
