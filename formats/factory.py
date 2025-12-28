@@ -1,5 +1,9 @@
 ﻿from .yml import format_yml
-from .avito_auto import format_avito_auto, format_avito_auto_new, format_avito_auto_used
+from .avito_auto import (
+    format_avito_auto,
+    format_avito_auto_new,
+    format_avito_auto_used,
+)
 
 
 class Formatter:
@@ -26,4 +30,4 @@ def get_formatter(name: str) -> Formatter:
     if name == "avito_auto_used":
         return Formatter(format_avito_auto_used)
 
-    raise ValueError(f"Unsupported format: {name}")
+    raise ValueError("Unsupported format")

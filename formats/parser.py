@@ -11,7 +11,7 @@ def _get_text(parent: ET.Element, tag: str) -> Optional[str]:
     return None
 
 
-def _clean_price(value: Optional[str]) -> Optional[int]:
+def _clean_int(value: Optional[str]) -> Optional[int]:
     if not value:
         return None
     digits = "".join([c for c in value if c.isdigit()])
@@ -35,11 +35,30 @@ def _get_phone(car: ET.Element) -> Optional[str]:
     return None
 
 
+def _get_condition_hint(car: ET.Element) -> Optional[str]:
+    """
+    Try multiple possible tags that can hint NEW/USED.
+    """
+    for tag in ("condition", "state", "is_new", "isNew", "new"):
+        v = _get_text(car, tag)
+        if v:
+            return v
+    return None
+
+
+def _get_mileage(car: ET.Element) -> Optional[int]:
+    """
+    Try multiple possible mileage tags.
+    """
+    for tag in ("run", "mileage", "odometer", "distance"):
+        v = _get_text(car, tag)
+        n = _clean_int(v)
+        if n is not None:
+            return n
+    return None
+
+
 def parse_cars(xml_bytes: bytes) -> List[Car]:
-    """
-    XML -> List[Car]
-    Ожидаем структуру с тегами <car>...</car>
-    """
     root = ET.fromstring(xml_bytes)
     cars: List[Car] = []
 
@@ -48,28 +67,29 @@ def parse_cars(xml_bytes: bytes) -> List[Car]:
         folder_id = _get_text(car, "folder_id") or ""
         modification_id = _get_text(car, "modification_id") or ""
         body_type = _get_text(car, "body_type") or ""
-
         year_raw = _get_text(car, "year")
         price_raw = _get_text(car, "price")
-
         vin = _get_text(car, "vin")
         url = _get_text(car, "url") or ""
-
         owners_number = _get_text(car, "owners_number")
         poi_id = _get_text(car, "poi_id")
         phone = _get_phone(car)
         picture = _get_first_picture(car)
 
+        # new fields
+        mileage_km = _get_mileage(car)
+        condition_hint = _get_condition_hint(car)
+
         if not (mark_id and folder_id and modification_id and year_raw and price_raw and url):
             continue
 
-        price = _clean_price(price_raw)
-        if not price:
+        price = _clean_int(price_raw)
+        if price is None:
             continue
 
         try:
             year = int(year_raw)
-        except:
+        except Exception:
             continue
 
         cars.append(
@@ -86,6 +106,8 @@ def parse_cars(xml_bytes: bytes) -> List[Car]:
                 owners_number_raw=owners_number,
                 poi_id=poi_id,
                 phone=phone,
+                mileage_km=mileage_km,
+                condition_hint=condition_hint,
             )
         )
 
