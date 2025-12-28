@@ -26,4 +26,4 @@ def get_formatter(name: str) -> Formatter:
     if name == "avito_auto_used":
         return Formatter(format_avito_auto_used)
 
-    raise ValueError("Unsupported format")
+    raise ValueError(f"Unsupported format: {name}")
