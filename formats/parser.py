@@ -1,3 +1,4 @@
+# formats/parser.py
 import xml.etree.ElementTree as ET
 from typing import List, Optional
 
@@ -6,15 +7,16 @@ from convert import Car
 
 def _get_text(parent: ET.Element, tag: str) -> Optional[str]:
     el = parent.find(tag)
-    if el is not None and el.text:
-        return el.text.strip()
+    if el is not None and el.text is not None:
+        t = el.text.strip()
+        return t if t else None
     return None
 
 
-def _clean_int(value: Optional[str]) -> Optional[int]:
+def _clean_price(value: Optional[str]) -> Optional[int]:
     if not value:
         return None
-    digits = "".join([c for c in value if c.isdigit()])
+    digits = "".join(c for c in value if c.isdigit())
     return int(digits) if digits else None
 
 
@@ -22,43 +24,32 @@ def _get_first_picture(car: ET.Element) -> Optional[str]:
     images_tag = car.find("images")
     if images_tag is None:
         return None
-    image = images_tag.find("image")
-    if image is not None and image.text and image.text.strip():
-        return image.text.strip()
+
+    # берём первый непустой <image>
+    for img in images_tag.findall("image"):
+        if img is not None and img.text:
+            t = img.text.strip()
+            if t:
+                return t
     return None
 
 
 def _get_phone(car: ET.Element) -> Optional[str]:
-    contact = car.find(".//contact/phone")
-    if contact is not None and contact.text:
-        return contact.text.strip()
-    return None
-
-
-def _get_condition_hint(car: ET.Element) -> Optional[str]:
-    """
-    Try multiple possible tags that can hint NEW/USED.
-    """
-    for tag in ("condition", "state", "is_new", "isNew", "new"):
-        v = _get_text(car, tag)
-        if v:
-            return v
-    return None
-
-
-def _get_mileage(car: ET.Element) -> Optional[int]:
-    """
-    Try multiple possible mileage tags.
-    """
-    for tag in ("run", "mileage", "odometer", "distance"):
-        v = _get_text(car, tag)
-        n = _clean_int(v)
-        if n is not None:
-            return n
+    # варианты структуры
+    for path in (".//contact/phone", ".//contact_info/contact/phone", ".//phone"):
+        el = car.find(path)
+        if el is not None and el.text:
+            t = el.text.strip()
+            if t:
+                return t
     return None
 
 
 def parse_cars(xml_bytes: bytes) -> List[Car]:
+    """
+    XML -> List[Car]
+    Требуемые поля: mark_id, folder_id, modification_id, year, price, url
+    """
     root = ET.fromstring(xml_bytes)
     cars: List[Car] = []
 
@@ -76,15 +67,12 @@ def parse_cars(xml_bytes: bytes) -> List[Car]:
         phone = _get_phone(car)
         picture = _get_first_picture(car)
 
-        # new fields
-        mileage_km = _get_mileage(car)
-        condition_hint = _get_condition_hint(car)
-
+        # обязательные
         if not (mark_id and folder_id and modification_id and year_raw and price_raw and url):
             continue
 
-        price = _clean_int(price_raw)
-        if price is None:
+        price = _clean_price(price_raw)
+        if not price:
             continue
 
         try:
@@ -106,8 +94,6 @@ def parse_cars(xml_bytes: bytes) -> List[Car]:
                 owners_number_raw=owners_number,
                 poi_id=poi_id,
                 phone=phone,
-                mileage_km=mileage_km,
-                condition_hint=condition_hint,
             )
         )
 

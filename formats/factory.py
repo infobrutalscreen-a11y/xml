@@ -1,4 +1,5 @@
-﻿from .yml import format_yml
+﻿# formats/factory.py
+from .yml import format_yml
 from .avito_auto import (
     format_avito_auto,
     format_avito_auto_new,
@@ -18,9 +19,12 @@ class Formatter:
 
 
 def get_formatter(name: str) -> Formatter:
+    name = (name or "").strip().lower()
+
     if name == "yml":
         return Formatter(format_yml)
 
+    # совместимость
     if name == "avito_auto":
         return Formatter(format_avito_auto)
 
