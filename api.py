@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, UploadFile, File, Request, Header, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Request, Header, HTTPException
 from fastapi.responses import HTMLResponse, Response, JSONResponse
 from fastapi.templating import Jinja2Templates
 
@@ -12,29 +12,14 @@ templates = Jinja2Templates(directory="templates")
 API_KEY = os.getenv("API_KEY", "supersecretkey123")
 
 
-def _build_response(content: str, fmt: str) -> Response:
-    content_type = "application/xml"
-    filename = f"feed.{fmt}.xml"
-
-    if fmt == "yml":
-        filename = "feed.yml"
-        content_type = "application/x-yaml"
-
-    return Response(
-        content=content,
-        media_type=content_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
-
-
-def require_api_key(x_api_key: str = Header(...)) -> None:
-    if x_api_key != API_KEY:
+def _require_api_key(x_api_key: str | None):
+    if not x_api_key or x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Invalid API key")
 
 
 @app.get("/", response_class=HTMLResponse)
-async def web_index(request: Request):
-    # Public UI (no API key shown)
+async def index(request: Request):
+    # UI для клиентов: форма будет слать на /web/convert
     return templates.TemplateResponse("index.html", {"request": request})
 
 
@@ -43,9 +28,9 @@ async def health():
     return {"status": "ok"}
 
 
-# -------------------------
-# PUBLIC WEB (NO KEY)
-# -------------------------
+# -----------------------------
+# WEB: без ключа (для клиентов)
+# -----------------------------
 @app.post("/web/convert")
 async def web_convert(
     file: UploadFile = File(...),
@@ -55,50 +40,59 @@ async def web_convert(
     cars = parse_cars(xml_bytes)
     formatter = get_formatter(format)
     result = formatter.render(cars)
-    return _build_response(result, format)
+
+    content_type = "application/xml"
+    filename = f"feed.{format}.xml"
+
+    if format == "yml":
+        filename = "feed.yml"
+        content_type = "application/x-yaml"
+
+    return Response(
+        content=result,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
-@app.post("/web/convert/json")
-async def web_convert_json(
+# -----------------------------
+# API: строго с ключом (платно)
+# -----------------------------
+@app.post("/api/v1/convert")
+async def convert_feed(
     file: UploadFile = File(...),
     format: str = "yml",
+    x_api_key: str = Header(None),
 ):
-    try:
-        xml_bytes = await file.read()
-        cars = parse_cars(xml_bytes)
-        formatter = get_formatter(format)
-        result = formatter.render(cars)
+    _require_api_key(x_api_key)
 
-        return {
-            "status": "ok",
-            "format": format,
-            "items": len(cars),
-            "content": result,
-        }
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
-
-
-# -------------------------
-# PAID/PRIVATE API (KEY)
-# -------------------------
-@app.post("/api/v1/convert", dependencies=[Depends(require_api_key)])
-async def api_convert(
-    file: UploadFile = File(...),
-    format: str = "yml",
-):
     xml_bytes = await file.read()
     cars = parse_cars(xml_bytes)
     formatter = get_formatter(format)
     result = formatter.render(cars)
-    return _build_response(result, format)
+
+    content_type = "application/xml"
+    filename = f"feed.{format}.xml"
+
+    if format == "yml":
+        filename = "feed.yml"
+        content_type = "application/x-yaml"
+
+    return Response(
+        content=result,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
-@app.post("/api/v1/convert/json", dependencies=[Depends(require_api_key)])
-async def api_convert_json(
+@app.post("/api/v1/convert/json")
+async def convert_feed_json(
     file: UploadFile = File(...),
     format: str = "yml",
+    x_api_key: str = Header(None),
 ):
+    _require_api_key(x_api_key)
+
     try:
         xml_bytes = await file.read()
         cars = parse_cars(xml_bytes)
