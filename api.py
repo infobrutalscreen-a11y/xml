@@ -8,8 +8,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import PlainTextResponse
 
-from formats.parser import parse_cars
+from formats.parser import parse_cars, parse_bytes_by_format
 from formats.factory import get_formatter
+from formats.vk.vk_factory import get_vk_formatter
 
 
 API_KEY = os.getenv("API_KEY", "supersecretkey123")
@@ -64,6 +65,32 @@ def _build_download_response(result: str, format: str) -> Response:
     if format == "yml":
         filename = "feed.yml"
         content_type = "application/x-yaml"
+
+    return Response(
+        content=result,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+# ---------------------------
+# VK specific response helper
+# ---------------------------
+
+def _build_vk_download_response(result: str, output_format: str, category: str) -> Response:
+    fmt = (output_format or "").lower()
+    filename = f"{category}_feed.{fmt}"
+    if fmt == "csv":
+        content_type = "text/csv"
+    elif fmt == "tsv":
+        content_type = "text/tab-separated-values"
+    elif fmt == "xml":
+        content_type = "application/xml"
+    elif fmt == "yml" or fmt == "yaml":
+        filename = f"{category}_feed.yml"
+        content_type = "application/x-yaml"
+    else:
+        content_type = "application/octet-stream"
 
     return Response(
         content=result,
@@ -133,6 +160,61 @@ async def api_convert_feed_json(
             "items": len(cars),
             "content": result
         }
+
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
+
+
+# ---------------------------
+# VK endpoints (separate endpoint for clarity and easier scaling)
+# ---------------------------
+@app.post("/api/v1/convert/vk")
+@limiter.limit("60/minute", key_func=api_key_or_ip)
+async def api_convert_vk(
+    request: Request,
+    file: UploadFile = File(...),
+    vk_category: str = "goods",
+    output_format: str = "csv",
+    input_format: str | None = None,
+    x_api_key: str = Header(...),
+):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
+    try:
+        data_bytes = await file.read()
+        rows = parse_bytes_by_format(data_bytes, input_format or "")
+
+        formatter = get_vk_formatter(vk_category)
+        result = formatter(rows, output_format=output_format)
+
+        return _build_vk_download_response(result, output_format, vk_category)
+
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
+
+
+@app.post("/api/v1/convert/vk/json")
+@limiter.limit("60/minute", key_func=api_key_or_ip)
+async def api_convert_vk_json(
+    request: Request,
+    file: UploadFile = File(...),
+    vk_category: str = "goods",
+    output_format: str = "csv",
+    input_format: str | None = None,
+    x_api_key: str = Header(...),
+):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
+    try:
+        data_bytes = await file.read()
+        rows = parse_bytes_by_format(data_bytes, input_format or "")
+
+        formatter = get_vk_formatter(vk_category)
+        result = formatter(rows, output_format=output_format)
+
+        return {"status": "ok", "category": vk_category, "format": output_format, "items": len(rows), "content": result}
 
     except Exception as e:
         return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
