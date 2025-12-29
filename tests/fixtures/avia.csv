@@ -1,0 +1,2 @@
+ID,Destination ID,Origin ID,Destination name,Origin name,Flight description,Image URL,Final URL,Flight price,Sale Price
+1,DEST1,ORIG1,Moscow,SPB,Flight 1,https://example.com/img.jpg,https://example.com/flight,100,90

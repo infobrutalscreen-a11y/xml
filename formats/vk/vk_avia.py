@@ -47,10 +47,25 @@ def render_tsv(items: List[dict]) -> str:
     return output.getvalue()
 
 
+def render_xml(items: List[dict]) -> str:
+    import xml.etree.ElementTree as ET
+    from formats.vk.vk_helpers import xml_tag
+
+    root = ET.Element("Items")
+    for item in items:
+        el = ET.SubElement(root, "Item")
+        for field in VK_AVIA_HEADERS:
+            child = ET.SubElement(el, xml_tag(field))
+            child.text = str(item.get(field, "")) or ""
+    return ET.tostring(root, encoding="utf-8").decode("utf-8")
+
+
 def format_vk_avia(data: List[dict], output_format: str = "csv") -> str:
     items = parse_input(data)
     if output_format == "csv":
         return render_csv(items)
     if output_format == "tsv":
         return render_tsv(items)
+    if output_format == "xml":
+        return render_xml(items)
     raise ValueError(f"Unsupported VK output format: {output_format}")
