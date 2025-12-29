@@ -2,10 +2,13 @@ from typing import List, Dict
 import re
 
 
-def _is_numberish(s: str) -> bool:
-    if s is None or s == "":
+def _is_numberish(s) -> bool:
+    if s is None:
         return False
-    s = str(s).strip()
+    try:
+        s = str(s).strip()
+    except Exception:
+        return False
     return bool(re.search(r"\d", s))
 
 
@@ -32,7 +35,7 @@ def validate_auto(items: List[Dict[str, str]]) -> List[str]:
             if not v:
                 warnings.append(f"row {idx+1}: missing required field '{f}'")
         year = item.get("year", "")
-        if year and not year.isdigit():
+        if year and not str(year).strip().isdigit():
             warnings.append(f"row {idx+1}: year looks invalid: '{year}'")
         price = item.get("price", "")
         if price and not _is_numberish(price):
