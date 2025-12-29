@@ -5,3 +5,7 @@ jinja2
 slowapi
 redis
 limits
+# Additional dependencies used by tests and VK parsers
+PyYAML
+httpx
+pytest

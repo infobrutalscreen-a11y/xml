@@ -1,7 +1,6 @@
 # formats/parser.py
 import xml.etree.ElementTree as ET
 import csv
-import yaml
 from io import StringIO
 from typing import List, Optional, Dict
 
@@ -23,6 +22,11 @@ def parse_csv_bytes(b: bytes, delimiter: str = ',') -> List[Dict[str, str]]:
 
 
 def parse_yaml_bytes(b: bytes) -> List[Dict[str, str]]:
+    try:
+        import yaml
+    except ImportError as e:
+        raise RuntimeError("Missing dependency 'PyYAML'. Install with: pip install pyyaml") from e
+
     s = b.decode('utf-8')
     data = yaml.safe_load(s)
     if isinstance(data, list):
