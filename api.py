@@ -189,16 +189,21 @@ async def api_convert_vk(
         fmt = (output_format or "csv").lower().strip()
 
         formatter = get_vk_formatter(cat)
-        # soft validation
-        from formats.vk.vk_validators import validate_vk_category
-        warnings = validate_vk_category(cat, rows)
+        # soft validation (defensive)
+        warnings = []
+        try:
+            from formats.vk.vk_validators import validate_vk_category
+            warnings = validate_vk_category(cat, rows) or []
+        except Exception as e:
+            # do not let validator crash the endpoint — include error header
+            headers = {"X-Validation-Error": str(e)}
+        else:
+            headers = {}
+            if warnings:
+                headers["X-Validation-Warnings"] = str(len(warnings))
+                headers["X-Validation-First"] = warnings[0]
 
         result = formatter(rows, output_format=fmt)
-
-        headers = {}
-        if warnings:
-            headers["X-Validation-Warnings"] = str(len(warnings))
-            headers["X-Validation-First"] = warnings[0]
 
         resp = _build_vk_download_response(result, fmt, cat)
         # merge headers
