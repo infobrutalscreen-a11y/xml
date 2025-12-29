@@ -27,4 +27,6 @@ def test_api_vk_convert_auto_xml():
         )
     assert r.status_code == 200
     assert r.headers.get("content-type", "").startswith("application/xml")
+    # Regression guard: ensure filename and content-type are correct for auto XML
+    assert 'attachment; filename="auto_feed.xml"' in r.headers.get("content-disposition", "")
     assert "<Items>" in r.text
