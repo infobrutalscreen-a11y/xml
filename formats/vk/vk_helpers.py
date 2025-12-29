@@ -21,3 +21,17 @@ def extract_text(element: ET.Element, tags: list[str]) -> Optional[str]:
         if found is not None and found.text:
             return found.text.strip()
     return None
+
+
+def xml_tag(name: str) -> str:
+    """Нормализует имя поля в допустимый XML-тег: заменяет точки/пробелы на подчёркивания
+    и оставляет только буквы, цифры и подчёркивания.
+    """
+    import re
+
+    tag = name.replace(".", "_").replace(" ", "_")
+    tag = re.sub(r'[^0-9A-Za-z_]', '_', tag)
+    # XML tag must not start with digit; prefix with '_' if so
+    if tag and tag[0].isdigit():
+        tag = f"_{tag}"
+    return tag

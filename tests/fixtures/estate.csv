@@ -1,0 +1,2 @@
+id,title,address,location.country,location.region,location.locality,price,image_link,link
+1,Flat,Some address,RU,Moscow,Moscow,500000,https://example.com/img.jpg,https://example.com/listing

@@ -1,16 +1,113 @@
 # formats/parser.py
 import xml.etree.ElementTree as ET
-from typing import List, Optional
+import csv
+from io import StringIO
+from typing import List, Optional, Dict
 
 from convert import Car
 
 
-def _get_text(parent: ET.Element, tag: str) -> Optional[str]:
-    el = parent.find(tag)
-    if el is not None and el.text is not None:
-        t = el.text.strip()
-        return t if t else None
-    return None
+def _normalize_row(row: Dict[str, str]) -> Dict[str, str]:
+    return {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
+
+
+def parse_csv_bytes(b: bytes, delimiter: str = ',') -> List[Dict[str, str]]:
+    s = b.decode('utf-8-sig')
+    f = StringIO(s)
+    reader = csv.DictReader(f, delimiter=delimiter)
+    rows: List[Dict[str, str]] = []
+    for r in reader:
+        rows.append(_normalize_row({k: (v if v is not None else '') for k, v in r.items()}))
+    return rows
+
+
+def parse_yaml_bytes(b: bytes) -> List[Dict[str, str]]:
+    try:
+        import yaml
+    except ImportError as e:
+        raise RuntimeError("Missing dependency 'PyYAML'. Install with: pip install pyyaml") from e
+
+    s = b.decode('utf-8')
+    data = yaml.safe_load(s)
+    if isinstance(data, list):
+        return [_normalize_row(r) for r in data]
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if isinstance(v, list):
+                return [_normalize_row(r) for r in v]
+        return [_normalize_row(data)]
+    return []
+
+
+def parse_xml_bytes(b: bytes) -> List[Dict[str, str]]:
+    root = ET.fromstring(b)
+
+    tag_counts: Dict[str, int] = {}
+    for child in root:
+        tag_counts[child.tag] = tag_counts.get(child.tag, 0) + 1
+
+    rows_tag = None
+    max_count = 0
+    for tag, cnt in tag_counts.items():
+        if cnt > max_count:
+            max_count = cnt
+            rows_tag = tag
+
+    items: List[Dict[str, str]] = []
+    if rows_tag and max_count > 1:
+        for el in root.findall(rows_tag):
+            d: Dict[str, str] = {}
+            for child in list(el):
+                if len(list(child)) == 0:
+                    d[child.tag] = (child.text or '').strip()
+                else:
+                    d[child.tag] = ''.join(ET.tostring(c, encoding='unicode') for c in child)
+            items.append(d)
+        return items
+
+    for tag in ('car', 'item', 'offer', 'row', 'entry'):
+        found = root.findall(f'.//{tag}')
+        if found:
+            for el in found:
+                d: Dict[str, str] = {}
+                for child in list(el):
+                    if len(list(child)) == 0:
+                        d[child.tag] = (child.text or '').strip()
+                    else:
+                        d[child.tag] = ''.join(ET.tostring(c, encoding='unicode') for c in child)
+                items.append(d)
+            return items
+
+    for child in root:
+        d: Dict[str, str] = {}
+        for c in list(child):
+            if len(list(c)) == 0:
+                d[c.tag] = (c.text or '').strip()
+            else:
+                d[c.tag] = ''.join(ET.tostring(cc, encoding='unicode') for cc in c)
+        if d:
+            items.append(d)
+
+    return items
+
+
+def parse_bytes_by_format(b: bytes, fmt: str) -> List[Dict[str, str]]:
+    fmt = (fmt or '').lower()
+    if fmt in ('csv', '.csv'):
+        return parse_csv_bytes(b, delimiter=',')
+    if fmt in ('tsv', '.tsv', 'txt'):
+        return parse_csv_bytes(b, delimiter='\t')
+    if fmt in ('yml', 'yaml', '.yml', '.yaml'):
+        return parse_yaml_bytes(b)
+    if fmt in ('xml', '.xml'):
+        return parse_xml_bytes(b)
+
+    s = b.lstrip()
+    if s.startswith(b'<'):
+        return parse_xml_bytes(b)
+    if s.startswith(b'-') or b'\n- ' in s:
+        return parse_yaml_bytes(b)
+    return parse_csv_bytes(b)
 
 
 def _clean_price(value: Optional[str]) -> Optional[int]:
