@@ -189,9 +189,21 @@ async def api_convert_vk(
         fmt = (output_format or "csv").lower().strip()
 
         formatter = get_vk_formatter(cat)
+        # soft validation
+        from formats.vk.vk_validators import validate_vk_category
+        warnings = validate_vk_category(cat, rows)
+
         result = formatter(rows, output_format=fmt)
 
-        return _build_vk_download_response(result, fmt, cat)
+        headers = {}
+        if warnings:
+            headers["X-Validation-Warnings"] = str(len(warnings))
+            headers["X-Validation-First"] = warnings[0]
+
+        resp = _build_vk_download_response(result, fmt, cat)
+        # merge headers
+        resp.headers.update(headers)
+        return resp
 
     except Exception as e:
         return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
@@ -218,9 +230,13 @@ async def api_convert_vk_json(
         fmt = (output_format or "csv").lower().strip()
 
         formatter = get_vk_formatter(cat)
+        # soft validation
+        from formats.vk.vk_validators import validate_vk_category
+        warnings = validate_vk_category(cat, rows)
+
         result = formatter(rows, output_format=fmt)
 
-        return {"status": "ok", "category": cat, "format": fmt, "items": len(rows), "content": result}
+        return {"status": "ok", "category": cat, "format": fmt, "items": len(rows), "warnings": warnings, "content": result}
 
     except Exception as e:
         return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
