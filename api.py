@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, UploadFile, File, Request, Header, HTTPException
+from fastapi import FastAPI, UploadFile, File, Request, Header, HTTPException, Form
 from fastapi.responses import HTMLResponse, Response, JSONResponse
 from fastapi.templating import Jinja2Templates
 
@@ -173,9 +173,9 @@ async def api_convert_feed_json(
 async def api_convert_vk(
     request: Request,
     file: UploadFile = File(...),
-    vk_category: str = "goods",
-    output_format: str = "csv",
-    input_format: str | None = None,
+    vk_category: str = Form("goods"),
+    output_format: str = Form("csv"),
+    input_format: str | None = Form(None),
     x_api_key: str = Header(...),
 ):
     if x_api_key != API_KEY:
@@ -185,10 +185,13 @@ async def api_convert_vk(
         data_bytes = await file.read()
         rows = parse_bytes_by_format(data_bytes, input_format or "")
 
-        formatter = get_vk_formatter(vk_category)
-        result = formatter(rows, output_format=output_format)
+        cat = (vk_category or "goods").lower().strip()
+        fmt = (output_format or "csv").lower().strip()
 
-        return _build_vk_download_response(result, output_format, vk_category)
+        formatter = get_vk_formatter(cat)
+        result = formatter(rows, output_format=fmt)
+
+        return _build_vk_download_response(result, fmt, cat)
 
     except Exception as e:
         return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
@@ -199,9 +202,9 @@ async def api_convert_vk(
 async def api_convert_vk_json(
     request: Request,
     file: UploadFile = File(...),
-    vk_category: str = "goods",
-    output_format: str = "csv",
-    input_format: str | None = None,
+    vk_category: str = Form("goods"),
+    output_format: str = Form("csv"),
+    input_format: str | None = Form(None),
     x_api_key: str = Header(...),
 ):
     if x_api_key != API_KEY:
@@ -211,10 +214,13 @@ async def api_convert_vk_json(
         data_bytes = await file.read()
         rows = parse_bytes_by_format(data_bytes, input_format or "")
 
-        formatter = get_vk_formatter(vk_category)
-        result = formatter(rows, output_format=output_format)
+        cat = (vk_category or "goods").lower().strip()
+        fmt = (output_format or "csv").lower().strip()
 
-        return {"status": "ok", "category": vk_category, "format": output_format, "items": len(rows), "content": result}
+        formatter = get_vk_formatter(cat)
+        result = formatter(rows, output_format=fmt)
+
+        return {"status": "ok", "category": cat, "format": fmt, "items": len(rows), "content": result}
 
     except Exception as e:
         return JSONResponse(status_code=400, content={"status": "error", "message": str(e)})
